@@ -1,0 +1,1 @@
+ALTER TABLE public.polls ADD COLUMN vote_time_limit INTEGER NOT NULL DEFAULT 30;

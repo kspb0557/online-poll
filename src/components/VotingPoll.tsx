@@ -112,6 +112,25 @@ export function VotingPoll({ pollId, onBack }: VotingPollProps) {
           );
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "votes", filter: `poll_id=eq.${pollId}` },
+        () => {
+          // Refetch all options when a new vote is inserted to ensure accurate counts
+          const refreshOptions = async () => {
+            const { data: updatedOpts } = await supabase
+              .from("poll_options")
+              .select("*")
+              .eq("poll_id", pollId)
+              .order("label");
+            
+            if (updatedOpts) {
+              setOptions(updatedOpts);
+            }
+          };
+          refreshOptions();
+        }
+      )
       .subscribe((status) => {
         console.log("Poll options subscription status:", status);
       });
@@ -157,12 +176,15 @@ export function VotingPoll({ pollId, onBack }: VotingPollProps) {
         throw voteErr;
       }
 
-      const option = options.find((o) => o.id === optionId);
-      if (option) {
-        await supabase
-          .from("poll_options")
-          .update({ vote_count: option.vote_count + 1 })
-          .eq("id", optionId);
+      // Refetch all options to get accurate vote counts
+      const { data: updatedOptions } = await supabase
+        .from("poll_options")
+        .select("*")
+        .eq("poll_id", pollId)
+        .order("label");
+
+      if (updatedOptions) {
+        setOptions(updatedOptions);
       }
 
       setHasVoted(true);

@@ -48,6 +48,27 @@ export function PollResults({ pollId, options: initialOptions, totalVotes: initi
           });
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "votes", filter: `poll_id=eq.${pollId}` },
+        () => {
+          // When a new vote is inserted, refetch options to get accurate counts
+          const fetchUpdatedOptions = async () => {
+            const { data: updatedOpts } = await supabase
+              .from("poll_options")
+              .select("*")
+              .eq("poll_id", pollId)
+              .order("label");
+            
+            if (updatedOpts) {
+              setOptions(updatedOpts);
+              const newTotal = updatedOpts.reduce((sum, opt) => sum + opt.vote_count, 0);
+              setTotalVotes(newTotal);
+            }
+          };
+          fetchUpdatedOptions();
+        }
+      )
       .subscribe();
 
     return () => {

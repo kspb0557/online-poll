@@ -112,8 +112,14 @@ export function VotingPoll({ pollId, onBack }: VotingPollProps) {
           );
         }
       )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+      .subscribe((status) => {
+        console.log("Poll options subscription status:", status);
+      });
+    
+    // Cleanup on unmount
+    return () => {
+      channel.unsubscribe();
+    };
   }, [pollId]);
 
   useEffect(() => {
@@ -279,7 +285,7 @@ export function VotingPoll({ pollId, onBack }: VotingPollProps) {
       )}
 
       {expired ? (
-        <PollResults options={options} totalVotes={totalVotes} onBack={onBack} />
+        <PollResults pollId={pollId} options={options} totalVotes={totalVotes} onBack={onBack} />
       ) : (
         <div className="bg-card rounded-2xl p-6 shadow-lg border border-border space-y-3">
           {hasVoted && (

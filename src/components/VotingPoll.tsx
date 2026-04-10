@@ -112,30 +112,8 @@ export function VotingPoll({ pollId, onBack }: VotingPollProps) {
           );
         }
       )
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "votes", filter: `poll_id=eq.${pollId}` },
-        () => {
-          // Refetch all options when a new vote is inserted to ensure accurate counts
-          const refreshOptions = async () => {
-            const { data: updatedOpts } = await supabase
-              .from("poll_options")
-              .select("*")
-              .eq("poll_id", pollId)
-              .order("label");
-            
-            if (updatedOpts) {
-              setOptions(updatedOpts);
-            }
-          };
-          refreshOptions();
-        }
-      )
-      .subscribe((status) => {
-        console.log("Poll options subscription status:", status);
-      });
+      .subscribe();
     
-    // Cleanup on unmount
     return () => {
       channel.unsubscribe();
     };
@@ -176,15 +154,21 @@ export function VotingPoll({ pollId, onBack }: VotingPollProps) {
         throw voteErr;
       }
 
-      // Refetch all options to get accurate vote counts
-      const { data: updatedOptions } = await supabase
-        .from("poll_options")
-        .select("*")
-        .eq("poll_id", pollId)
-        .order("label");
-
-      if (updatedOptions) {
-        setOptions(updatedOptions);
+      // Update the vote count locally and in database
+      const option = options.find((o) => o.id === optionId);
+      if (option) {
+        // Update in database
+        await supabase
+          .from("poll_options")
+          .update({ vote_count: option.vote_count + 1 })
+          .eq("id", optionId);
+        
+        // Update locally for immediate UI feedback
+        setOptions((prev) =>
+          prev.map((o) =>
+            o.id === optionId ? { ...o, vote_count: o.vote_count + 1 } : o
+          )
+        );
       }
 
       setHasVoted(true);
